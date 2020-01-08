@@ -9,6 +9,7 @@
 
 {% block navbar %}
 <ul class="nav navbar-nav navbar-right">
+        <li><a href="{{url_for('home_page')}}">Home</a></li>
         <li><a href="{{url_for('list_tables', table_name='subject')}}">Subjects</a></li>
         <li><a href="{{url_for('list_tables', table_name='student')}}">Students</a></li>
         <li><a href="{{url_for('list_tables', table_name='lab')}}">Labs</a></li>

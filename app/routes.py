@@ -53,8 +53,8 @@ def add_table_instance_decorator(fn):
             max_id = session.query(ReflectedModels[table_name]).order_by(getattr(ReflectedModels[table_name], table_name + '_id').desc()).first()
             fields = {i: form[i].data for i in table_fields if i != (table_name + '_id')}
             fields[table_name + '_id'] = getattr(max_id, table_name + '_id') + 1
-            table_instance = ReflectedModels[table_name](**fields)
             try:
+                table_instance = ReflectedModels[table_name](**fields)
                 # add department to the database
                 session.add(table_instance)
                 session.commit()
@@ -62,7 +62,8 @@ def add_table_instance_decorator(fn):
             except Exception as e:
                 # in case department name already exists
                 print(e)
-                flash("Error: Can't create instance (check existence of instances with selected id)")
+                session.rollback()
+                flash("Error: Can't create instance (check existence of instances with selected id or correctness of other fields)")
 
             # redirect to departments page
             return redirect(url_for('list_tables', table_name=table_name))
@@ -93,18 +94,27 @@ def edit_table_instance_decorator(fn):
             return abort(404)
         # check_admin()
         add_instance = False
-        table_fields = ReflectedModels[table_name].__table__.columns.keys()
-        table_instance = session.query(ReflectedModels[table_name]).filter_by(**{table_name+'_id': instance_id}).first()
-        if not table_instance:
+        try:
+            table_fields = ReflectedModels[table_name].__table__.columns.keys()
+            table_instance = session.query(ReflectedModels[table_name]).filter_by(**{table_name+'_id': instance_id}).first()
+            if not table_instance:
+                abort(404)
+            form = globals()["".join([i[0].upper() + i[1:] for i in table_name.split("_")]) + "Form"]
+            form = form(obj=table_instance)
+        except:
             abort(404)
-        form = globals()["".join([i[0].upper() + i[1:] for i in table_name.split("_")]) + "Form"]
-        form = form(obj=table_instance)
         if form.validate_on_submit():
-            for table_field in table_fields:
-                if table_field != (table_name + '_id'):
-                    setattr(table_instance, table_field, form[table_field].data)
-            session.commit()
-            flash('You have successfully edited the table_instance.')
+            try:
+                for table_field in table_fields:
+                    if table_field != (table_name + '_id'):
+                        setattr(table_instance, table_field, form[table_field].data)
+                session.commit()
+                flash('You have successfully edited the table_instance.')
+            except Exception as e:
+                # in case department name already exists
+                print(e)
+                session.rollback()
+                flash("Error: Can't edit instance (check existence of instances with selected id or correctness of other fields)")
             # redirect to the departments page
             return redirect(url_for('list_tables', table_name=table_name))
 
@@ -158,7 +168,7 @@ def delete_table_instance(table_name, id):
 
 @app.route('/')
 @app.route('/index')
-def hello_world():
+def home_page():
     sql_cmd_graph1 = sqlalchemy.text('''   select student.student_name, count(lab_result.lab_id) 
                                     from student, lab_result 
                                     where student.student_id = lab_result.student_id 
